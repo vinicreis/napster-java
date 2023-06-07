@@ -2,24 +2,26 @@ package tcp;
 
 import interfaces.network.IPeer;
 import interfaces.service.INapster;
+import model.response.JoinResponse;
+import util.Assert;
 import util.ILog;
 import util.Log;
 
-import java.io.BufferedReader;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
-import java.util.UUID;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class Peer implements IPeer {
     private static final ILog log = new Log("Peer");
     private static INapster napster;
     private String ip;
     private Integer port;
+    private File folder;
 
     static {
         try {
@@ -32,8 +34,21 @@ public class Peer implements IPeer {
 
     private Peer(String ip, Integer port) {
         try {
+            Assert.True(ip != null && !ip.isEmpty(), "IP cannot be null or empty");
+            // TODO: Check if IP address is valid
+            Assert.True(port != null, "Port cannot be null");
+            Assert.True(port > 0, "Port must be greater than 0");
+
             this.ip = ip;
             this.port = port;
+            this.folder = new File(
+                    System.getProperty("user.dir"),
+                    String.format("peer-%s-%d", ip.replace(".", "-"), port)
+            );
+
+            if(!this.folder.exists() && !this.folder.mkdir()) {
+                throw new RuntimeException("Failed to create peer folder");
+            }
         } catch (Exception e) {
             log.e("Failed to initialize peer", e);
         }
@@ -41,12 +56,13 @@ public class Peer implements IPeer {
 
     public static void main(String[] args) {
         try {
-            if(args.length < 2) {
-                throw new IllegalArgumentException("IP and port should be entered to start peer");
-            }
+            Assert.True(args.length >= 1, "IP and port argument are mandatory");
 
             String ip = args[0];
             Integer port = Integer.valueOf(args[1]);
+            Peer peer = new Peer(ip, port);
+
+            peer.join();
 
             while(true) {
 
@@ -56,6 +72,30 @@ public class Peer implements IPeer {
         } catch (Exception e) {
             log.e("Peer execution error", e);
         }
+    }
+
+    public void join() throws RuntimeException {
+        File[] filesArray = folder.listFiles();
+
+        Assert.True(filesArray != null, "Peer file list is null");
+
+        List<File> files = Arrays.asList(filesArray);
+
+        String result = napster.join(ip, port, files.stream().map(File::getName).collect(Collectors.toList()));
+
+        if(result.equals(JoinResponse.OK.getCode())) {
+            log.i("Successfully joined to server!");
+        } else {
+            throw new RuntimeException("Failed to join to server");
+        }
+    }
+
+    public void update(String filename) {
+        File file = new File(folder.getAbsolutePath(), filename);
+
+        Assert.True(file.exists(), String.format("File %s do not exists", filename));
+
+
     }
 
     @Override
