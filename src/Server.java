@@ -1,15 +1,13 @@
-package tcp;
-
 import service.Napster;
-import util.ILog;
 import util.Log;
+import util.ConsoleLog;
 
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 
 public class Server {
-    private static final ILog log = new Log("Server");
+    private static final Log log = new ConsoleLog("Server");
     private static final Napster napster;
 
     static {

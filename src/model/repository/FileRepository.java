@@ -5,13 +5,15 @@ import java.util.*;
 public class FileRepository {
     private final HashMap<String, LinkedHashSet<String>> hostMap = new HashMap<>();
 
-    public void add(String ip, Integer port, List<String> files) {
+    public void add(String key, List<String> files) {
         // TODO: Check if peer is already added
         // TODO: Check if filename is valid
 
-        LinkedHashSet<String> hostFiles = hostMap.getOrDefault(ip + ":" + port.toString(), new LinkedHashSet<>());
+        LinkedHashSet<String> hostFiles = hostMap.getOrDefault(key, new LinkedHashSet<>());
 
         hostFiles.addAll(files);
+
+        hostMap.replace(key, hostFiles);
     }
 
     public List<String> search(String filenameWithExtension) {
@@ -27,10 +29,14 @@ public class FileRepository {
         return foundOn;
     }
 
-    public void update(String ip, Integer port, String file) {
+    public void update(String key, String file) {
         // TODO: Check if peer exists
         // TODO: Check if filename is valid
 
-        hostMap.get(ip + ":" + port.toString()).add(file);
+        LinkedHashSet<String> hostFiles = hostMap.getOrDefault(key, new LinkedHashSet<>());
+
+        hostFiles.add(file);
+
+        hostMap.replace(key, hostFiles);
     }
 }

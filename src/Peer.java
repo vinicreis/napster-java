@@ -1,23 +1,22 @@
-package tcp;
-
 import interfaces.service.INapster;
-import model.response.JoinResponse;
-import util.ILog;
 import util.Log;
+import util.ConsoleLog;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
+import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Scanner;
 import java.util.concurrent.CancellationException;
 import java.util.stream.Collectors;
 
 public class Peer {
-    private static final ILog log = new Log("Peer");
+    private static final Log log = new ConsoleLog("Peer");
     private static INapster napster;
     private String ip;
     private Integer port;
@@ -77,33 +76,15 @@ public class Peer {
         }
 
         public static Operation read() throws IllegalArgumentException {
-            return valueOf(Integer.valueOf(System.console().readLine()));
+            return valueOf(Integer.valueOf(readInput()));
         }
 
         public static void print() {
             for (Operation operation : Operation.values()) {
                 System.out.printf("%s[%d]\n", operation.toString(), operation.code);
             }
-        }
-    }
 
-    static class OperationThread extends Thread {
-        private final Peer peer;
-        private final Operation operation;
-
-        OperationThread(Peer peer, Operation operation) {
-            this.peer = peer;
-            this.operation = operation;
-        }
-
-        @Override
-        public void run() {
-            switch (operation) {
-                case UPDATE: peer.update(); break;
-                case SEARCH: peer.search(); break;
-                case DOWNLOAD: peer.download(); break;
-                case EXIT: throw new CancellationException();
-            }
+            System.out.print("\n");
         }
     }
 
@@ -183,6 +164,7 @@ public class Peer {
                 Long size = Long.decode(reader.readLine());
                 char[] buffer = new char[Math.toIntExact(size)];
 
+                log.i("Downloading file...");
                 try(final FileWriter fileWriter = new FileWriter(file)) {
                     int count;
 
@@ -245,16 +227,22 @@ public class Peer {
             ServerThread serverThread = new ServerThread(port, peer.folder);
             serverThread.start();
 
-            while(true) {
-                System.out.print("Select an option:");
+            boolean running = true;
+
+            while(running) {
+                System.out.print("Select an option:\n\n");
                 Operation.print();
                 Operation operation = Operation.read();
 
-                if(operation.equals(Operation.EXIT))
-                    throw new CancellationException();
+                switch (operation) {
+                    case UPDATE: peer.update(); break;
+                    case SEARCH: peer.search(); break;
+                    case DOWNLOAD: peer.download(); break;
+                    case EXIT:
+                        serverThread.interrupt();
 
-                OperationThread thread = new OperationThread(peer, operation);
-                thread.start();
+                        running = false;
+                }
             }
         } catch (CancellationException e) {
             System.out.print("Peer finished!");
@@ -265,7 +253,7 @@ public class Peer {
         }
     }
 
-    public void join() throws RuntimeException {
+    public void join() throws RuntimeException, RemoteException {
         File[] filesArray = folder.listFiles();
 
         assert filesArray != null : "Peer file list is null";
@@ -274,21 +262,21 @@ public class Peer {
 
         String result = napster.join(ip, port, files.stream().map(File::getName).collect(Collectors.toList()));
 
-        if(result.equals(JoinResponse.OK.getCode())) {
+        // TODO: Extract string results to enum
+        if(result.equals("JOIN_OK")) {
             log.i("Successfully joined to server!");
         } else {
             throw new RuntimeException("Failed to join to server");
         }
     }
 
-    public void update() {
-        System.out.print("Enter the updated filename: ");
-        String filename = System.console().readLine();
+    public void update() throws RemoteException {
+        String filename = readInput("Enter the updated filename: ");
 
         update(filename);
     }
 
-    public void update(String filename) {
+    public void update(String filename) throws RemoteException {
         File file = new File(folder.getAbsolutePath(), filename);
 
         assert file.exists() : String.format("File %s do not exists", filename);
@@ -303,8 +291,8 @@ public class Peer {
         }
     }
 
-    public void search() {
-        String filename = System.console().readLine();
+    public void search() throws RemoteException {
+        String filename = readInput("Enter the filename to search: ");
 
         List<String> result = napster.search(filename);
 
@@ -321,16 +309,13 @@ public class Peer {
 
     public void download() {
         try {
-            System.out.print("Enter peer IP: ");
-            final String ip = System.console().readLine();
+            final String ip = readInput("Enter peer IP: ");
             // TODO: Check if IP is valid
 
-            System.out.print("Enter peer port: ");
-            final int port = Integer.parseInt(System.console().readLine());
+            final int port = Integer.parseInt(readInput("Enter peer port: "));
             // TODO: Check if port is valid
 
-            System.out.print("Enter the filename: ");
-            final String filename = System.console().readLine();
+            final String filename = readInput("Enter the filename: ");
 
             Socket socket = new Socket(ip, port);
             DownloadThread thread = new DownloadThread(this, socket, filename);
@@ -339,5 +324,17 @@ public class Peer {
         } catch(IOException e) {
             log.e("Server failed!", e);
         }
+    }
+
+    private static String readInput() {
+        Scanner in = new Scanner(System.in);
+
+        return in.nextLine();
+    }
+
+    private static String readInput(String message, Object... args) {
+        System.out.printf(message, args);
+
+        return readInput();
     }
 }

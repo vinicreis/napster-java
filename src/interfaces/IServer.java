@@ -1,4 +1,4 @@
-package interfaces.network;
+package interfaces;
 
 public interface IServer {
     void start(int port);
