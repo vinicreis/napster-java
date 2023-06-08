@@ -1,22 +1,22 @@
 package tcp;
 
-import interfaces.network.IPeer;
 import interfaces.service.INapster;
 import model.response.JoinResponse;
-import util.Assert;
 import util.ILog;
 import util.Log;
 
 import java.io.*;
+import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.UnknownHostException;
+import java.nio.file.Files;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.stream.Collectors;
 
-public class Peer implements IPeer {
+public class Peer {
     private static final ILog log = new Log("Peer");
     private static INapster napster;
     private String ip;
@@ -54,43 +54,181 @@ public class Peer implements IPeer {
         }
     }
 
-    enum Option {
+    enum Operation {
         UPDATE(1),
         SEARCH(2),
-        DOWNLOAD(3);
+        DOWNLOAD(3),
+        EXIT(0);
 
         public final Integer code;
 
-        Option(int code) {
+        Operation(int code) {
             this.code = code;
         }
 
-        public static Option valueOf(Integer code) throws IllegalArgumentException {
+        public static Operation valueOf(Integer code) throws IllegalArgumentException {
             switch (code) {
                 case 1: return UPDATE;
                 case 2: return SEARCH;
                 case 3: return DOWNLOAD;
+                case 0: return EXIT;
                 default: throw new IllegalArgumentException("Invalid option selected!");
             }
         }
 
-        public static Option readOption() throws IllegalArgumentException {
+        public static Operation read() throws IllegalArgumentException {
             return valueOf(Integer.valueOf(System.console().readLine()));
+        }
+
+        public static void print() {
+            for (Operation operation : Operation.values()) {
+                System.out.printf("%s[%d]\n", operation.toString(), operation.code);
+            }
         }
     }
 
-    class PeerThread extends Thread {
+    static class OperationThread extends Thread {
         private final Peer peer;
-        private final Option option;
+        private final Operation operation;
 
-        PeerThread(Peer peer, Option option) {
+        OperationThread(Peer peer, Operation operation) {
             this.peer = peer;
-            this.option = option;
+            this.operation = operation;
         }
 
         @Override
         public void run() {
+            switch (operation) {
+                case UPDATE: peer.update(); break;
+                case SEARCH: peer.search(); break;
+                case DOWNLOAD: peer.download(); break;
+                case EXIT: throw new CancellationException();
+            }
+        }
+    }
 
+    static class UploadThread extends Thread {
+        private Socket socket;
+        private BufferedReader reader;
+        private OutputStream writer;
+        private File folder;
+
+        UploadThread(Socket socket, File folder) {
+            try {
+                this.folder = folder;
+                this.socket = socket;
+                this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                this.writer = new DataOutputStream(socket.getOutputStream());
+            } catch (Exception e) {
+                log.e("Failed to initialize UploadThread", e);
+            }
+        }
+
+        @Override
+        public void run() {
+            try {
+                String filename = reader.readLine();
+                File file = new File(folder.getPath(), filename);
+
+                assert file.exists() : String.format("File %s not found!", filename);
+
+                log.i("Sending download size to peer...");
+                writer.write(String.valueOf(file.length()).getBytes());
+
+                log.i(String.format("Uploading file to peer %s", socket.getInetAddress().getHostName()));
+                writer.write(Files.readAllBytes(file.toPath()));
+                log.i("Upload finished! Closing connection...");
+
+                socket.close();
+            } catch (Exception e) {
+                log.e(String.format("Failed to upload file to peer %s", socket.getInetAddress().getHostName()));
+            }
+        }
+    }
+
+    class DownloadThread extends Thread {
+        private Peer peer;
+        private Socket socket;
+        private BufferedReader reader;
+        private OutputStream writer;
+        private String filename;
+
+        DownloadThread(Peer peer, Socket socket, String filename) {
+            try {
+                this.peer = peer;
+                this.socket = socket;
+                this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                this.writer = new DataOutputStream(socket.getOutputStream());
+                this.filename = filename;
+            } catch (Exception e) {
+                log.e("Failed to initialize UploadThread", e);
+            }
+        }
+
+        @Override
+        public void run() {
+            try {
+                File file = new File(folder, filename);
+
+                if (file.createNewFile()) {
+                    log.i(String.format("Created file %s to download...", filename));
+                } else {
+                    throw new RuntimeException(String.format("File %s already exists!", filename));
+                }
+
+                log.i("Sending wanted file's name...");
+                writer.write(filename.getBytes());
+
+                log.i("Reading file size to create buffer...");
+                Long size = Long.decode(reader.readLine());
+                char[] buffer = new char[Math.toIntExact(size)];
+
+                try(final FileWriter fileWriter = new FileWriter(file)) {
+                    int count;
+
+                    do {
+                        count = (reader.read(buffer));
+
+                        if(count > 0) {
+                            fileWriter.write(buffer, 0, count);
+                        }
+                    } while (count > 0);
+                }
+
+                log.i("File download! Updating on server...");
+                peer.update(filename);
+                socket.close();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    static class ServerThread extends Thread {
+        private final int port;
+        private final File folder;
+
+        ServerThread(int port, File folder) {
+            this.port = port;
+            this.folder = folder;
+        }
+
+        @Override
+        public void run() {
+            try(ServerSocket server = new ServerSocket(port)) {
+                log.i("Starting server...");
+
+                while (true) {
+                    log.i("Listening download requests...");
+                    Socket socket = server.accept();
+                    log.i(String.format("Connection established with peer %s", socket.getInetAddress().getHostName()));
+
+                    UploadThread thread = new UploadThread(socket, folder);
+                    thread.start();
+                }
+            } catch (Exception e) {
+                log.e("Failed to start server!", e);
+            }
         }
     }
 
@@ -99,20 +237,27 @@ public class Peer implements IPeer {
             assert args.length >= 1 : "IP and port argument are mandatory";
 
             String ip = args[0];
-            Integer port = Integer.valueOf(args[1]);
+            int port = Integer.parseInt(args[1]);
             Peer peer = new Peer(ip, port);
 
             peer.join();
 
-            while(true) {
-                Option option = Option.readOption();
+            ServerThread serverThread = new ServerThread(port, peer.folder);
+            serverThread.start();
 
-                switch (option) {
-                    case UPDATE: peer.update(); break;
-                    case SEARCH:
-                    case DOWNLOAD:
-                }
+            while(true) {
+                System.out.print("Select an option:");
+                Operation.print();
+                Operation operation = Operation.read();
+
+                if(operation.equals(Operation.EXIT))
+                    throw new CancellationException();
+
+                OperationThread thread = new OperationThread(peer, operation);
+                thread.start();
             }
+        } catch (CancellationException e) {
+            System.out.print("Peer finished!");
         } catch (NumberFormatException e) {
             log.e(String.format("Port %s is invalid", args[1]), e);
         } catch (Exception e) {
@@ -164,58 +309,33 @@ public class Peer implements IPeer {
         List<String> result = napster.search(filename);
 
         if(result.isEmpty()) {
-            System.console().printf("No peers found with the file %s", filename);
+            System.out.printf("No peers found with the file %s", filename);
         } else {
-            System.console().printf("File found on peers:");
+            System.out.print("File found on peers:");
 
             for (String peer : result) {
-                System.console().printf(peer);
+                System.out.print(peer);
             }
-        }
-    }
-
-    @Override
-    public Boolean open(String ip, int port) {
-        try {
-            socket = new Socket(ip, port);
-            reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            writer = new DataOutputStream(socket.getOutputStream());
-
-            return true;
-        } catch (UnknownHostException e) {
-            log.e(String.format("Host %s:%s not known", ip, port), e); return false;
-        } catch (Exception e) {
-            log.e(String.format("Failed to open connection to host %s:%s", ip, port)); return false;
-        }
-    }
-
-    public String read() throws IOException {
-        return reader.readLine();
-    }
-
-    public void write(String msg) throws IOException {
-        writer.writeBytes(msg);
-    }
-
-    @Override
-    public Boolean close() {
-        try {
-            socket.close(); return true;
-        } catch (Exception e) {
-            log.e("Failed to close socket", e); return false;
         }
     }
 
     public void download() {
         try {
-            while(true) {
-                log.i("Waiting client connection...");
-                Socket clientSocket = serverSocket.accept();
+            System.out.print("Enter peer IP: ");
+            final String ip = System.console().readLine();
+            // TODO: Check if IP is valid
 
-                log.i(String.format("Client connected on port %d", client.getPort()));
-                DedicatedClientThread clientThread = new DedicatedClientThread(clientSocket);
-                clientThread.start();
-            }
+            System.out.print("Enter peer port: ");
+            final int port = Integer.parseInt(System.console().readLine());
+            // TODO: Check if port is valid
+
+            System.out.print("Enter the filename: ");
+            final String filename = System.console().readLine();
+
+            Socket socket = new Socket(ip, port);
+            DownloadThread thread = new DownloadThread(this, socket, filename);
+
+            thread.start();
         } catch(IOException e) {
             log.e("Server failed!", e);
         }
