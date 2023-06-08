@@ -13,7 +13,7 @@ public class FileRepository {
 
         hostFiles.addAll(files);
 
-        hostMap.replace(key, hostFiles);
+        hostMap.put(key, hostFiles);
     }
 
     public List<String> search(String filenameWithExtension) {
@@ -37,6 +37,6 @@ public class FileRepository {
 
         hostFiles.add(file);
 
-        hostMap.replace(key, hostFiles);
+        hostMap.put(key, hostFiles);
     }
 }
