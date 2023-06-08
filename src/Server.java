@@ -1,8 +1,7 @@
 import service.Napster;
-import util.Log;
 import util.ConsoleLog;
+import util.Log;
 
-import java.rmi.AlreadyBoundException;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;

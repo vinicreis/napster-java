@@ -14,7 +14,6 @@ import java.rmi.registry.Registry;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
-import java.util.concurrent.CancellationException;
 import java.util.stream.Collectors;
 
 public class Peer {
