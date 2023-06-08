@@ -1,11 +1,10 @@
 import interfaces.service.INapster;
-import util.Log;
 import util.ConsoleLog;
+import util.Log;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.file.Files;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -16,6 +15,7 @@ import java.util.concurrent.CancellationException;
 import java.util.stream.Collectors;
 
 public class Peer {
+    private static final int BUFFER_SIZE = 4096;
     private static final Log log = new ConsoleLog("Peer");
     private static INapster napster;
     private String ip;
@@ -99,7 +99,7 @@ public class Peer {
                 this.folder = folder;
                 this.socket = socket;
                 this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                this.writer = new DataOutputStream(socket.getOutputStream());
+                this.writer = socket.getOutputStream();
             } catch (Exception e) {
                 log.e("Failed to initialize UploadThread", e);
             }
@@ -108,16 +108,27 @@ public class Peer {
         @Override
         public void run() {
             try {
+                log.i("Upload started! Reading desired file from client...");
                 String filename = reader.readLine();
                 File file = new File(folder.getPath(), filename);
 
                 assert file.exists() : String.format("File %s not found!", filename);
 
-                log.i("Sending download size to peer...");
-                writer.write(String.valueOf(file.length()).getBytes());
+                FileInputStream fileReader = new FileInputStream(file);
+                byte[] buffer = new byte[BUFFER_SIZE];
+                int read;
 
                 log.i(String.format("Uploading file to peer %s", socket.getInetAddress().getHostName()));
-                writer.write(Files.readAllBytes(file.toPath()));
+                // TODO: Add progress print
+                do {
+                    read = fileReader.read(buffer);
+
+                    if(read > 0) {
+                        writer.write(buffer, 0, read);
+                        writer.flush();
+                    }
+                } while (read > 0);
+
                 log.i("Upload finished! Closing connection...");
 
                 socket.close();
@@ -130,16 +141,16 @@ public class Peer {
     class DownloadThread extends Thread {
         private Peer peer;
         private Socket socket;
-        private BufferedReader reader;
-        private OutputStream writer;
+        private BufferedInputStream reader;
+        private PrintWriter writer;
         private String filename;
 
         DownloadThread(Peer peer, Socket socket, String filename) {
             try {
                 this.peer = peer;
                 this.socket = socket;
-                this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                this.writer = new DataOutputStream(socket.getOutputStream());
+                this.reader = new BufferedInputStream(socket.getInputStream());
+                this.writer = new PrintWriter(socket.getOutputStream(), true);
                 this.filename = filename;
             } catch (Exception e) {
                 log.e("Failed to initialize UploadThread", e);
@@ -158,14 +169,12 @@ public class Peer {
                 }
 
                 log.i("Sending wanted file's name...");
-                writer.write(filename.getBytes());
+                writer.println(filename);
 
-                log.i("Reading file size to create buffer...");
-                Long size = Long.decode(reader.readLine());
-                char[] buffer = new char[Math.toIntExact(size)];
+                byte[] buffer = new byte[BUFFER_SIZE];
 
                 log.i("Downloading file...");
-                try(final FileWriter fileWriter = new FileWriter(file)) {
+                try(final FileOutputStream fileWriter = new FileOutputStream(file)) {
                     int count;
 
                     do {
@@ -245,7 +254,7 @@ public class Peer {
                 }
             }
         } catch (CancellationException e) {
-            System.out.print("Peer finished!");
+            System.out.println("Peer finished!");
         } catch (NumberFormatException e) {
             log.e(String.format("Port %s is invalid", args[1]), e);
         } catch (Exception e) {
@@ -297,12 +306,12 @@ public class Peer {
         List<String> result = napster.search(filename);
 
         if(result.isEmpty()) {
-            System.out.printf("No peers found with the file %s", filename);
+            System.out.printf("No peers found with the file %s\n", filename);
         } else {
-            System.out.print("File found on peers:");
+            System.out.println("File found on peers:");
 
             for (String peer : result) {
-                System.out.print(peer);
+                System.out.println(peer);
             }
         }
     }
