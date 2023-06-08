@@ -1,10 +1,13 @@
-import interfaces.service.INapster;
+import service.INapster;
 import util.ConsoleLog;
 import util.Log;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
+import java.nio.file.Paths;
+import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -16,23 +19,22 @@ import java.util.stream.Collectors;
 
 public class Peer {
     private static final int BUFFER_SIZE = 4096;
-    private static final Log log = new ConsoleLog("Peer");
-    private static INapster napster;
-    private String ip;
-    private Integer port;
-    private File folder;
+    private final INapster napster;
+    private final Log log = new ConsoleLog("Peer");
+    private final String ip;
+    private final Integer port;
+    private final File folder;
+    private final ServerThread serverThread;
+    private final ServerSocket serverSocket;
 
-    static {
+    private Peer(String ip, Integer port, boolean debug) throws NotBoundException, IOException {
         try {
+            log.setDebug(debug);
+
             Registry registry = LocateRegistry.getRegistry();
-            napster = (INapster) registry.lookup("rmi://127.0.0.1/napster");
-        } catch (Exception e) {
-            log.e("Failed to initialize peer", e);
-        }
-    }
+            this.napster = (INapster) registry.lookup("rmi://localhost/napster");
 
-    private Peer(String ip, Integer port) {
-        try {
+            assert napster != null : "Napster server is not available";
             assert ip != null && !ip.isEmpty() : "IP cannot be null or empty";
             // TODO: Check if IP address is valid
             assert port != null : "Port cannot be null";
@@ -41,15 +43,23 @@ public class Peer {
             this.ip = ip;
             this.port = port;
             this.folder = new File(
-                    System.getProperty("user.dir"),
-                    String.format("peer-%s-%d", ip.replace(".", "-"), port)
+                    Paths.get(
+                            System.getProperty("user.dir"),
+                            "data",
+                            String.format("peer-%s-%d", ip.replace(".", "-"), port)
+                    ).toUri()
             );
 
             if(!this.folder.exists() && !this.folder.mkdir()) {
                 throw new RuntimeException("Failed to create peer folder");
             }
+
+            this.serverThread = new ServerThread();
+            this.serverSocket = new ServerSocket(this.port);
         } catch (Exception e) {
             log.e("Failed to initialize peer", e);
+
+            throw e;
         }
     }
 
@@ -88,15 +98,13 @@ public class Peer {
         }
     }
 
-    static class UploadThread extends Thread {
+    class UploadThread extends Thread {
         private Socket socket;
         private BufferedReader reader;
         private OutputStream writer;
-        private File folder;
 
-        UploadThread(Socket socket, File folder) {
+        UploadThread(Socket socket) {
             try {
-                this.folder = folder;
                 this.socket = socket;
                 this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                 this.writer = socket.getOutputStream();
@@ -108,7 +116,7 @@ public class Peer {
         @Override
         public void run() {
             try {
-                log.i("Upload started! Reading desired file from client...");
+                log.d("Upload started! Reading desired file from client...");
                 String filename = reader.readLine();
                 File file = new File(folder.getPath(), filename);
 
@@ -118,7 +126,7 @@ public class Peer {
                 byte[] buffer = new byte[BUFFER_SIZE];
                 int read;
 
-                log.i(String.format("Uploading file to peer %s", socket.getInetAddress().getHostName()));
+                log.d(String.format("Uploading file to peer %s", socket.getInetAddress().getHostName()));
                 // TODO: Add progress print
                 do {
                     read = fileReader.read(buffer);
@@ -129,7 +137,7 @@ public class Peer {
                     }
                 } while (read > 0);
 
-                log.i("Upload finished! Closing connection...");
+                log.d("Upload finished! Closing connection...");
 
                 socket.close();
             } catch (Exception e) {
@@ -139,15 +147,13 @@ public class Peer {
     }
 
     class DownloadThread extends Thread {
-        private Peer peer;
         private Socket socket;
         private BufferedInputStream reader;
         private PrintWriter writer;
         private String filename;
 
-        DownloadThread(Peer peer, Socket socket, String filename) {
+        DownloadThread(Socket socket, String filename) {
             try {
-                this.peer = peer;
                 this.socket = socket;
                 this.reader = new BufferedInputStream(socket.getInputStream());
                 this.writer = new PrintWriter(socket.getOutputStream(), true);
@@ -163,17 +169,17 @@ public class Peer {
                 File file = new File(folder, filename);
 
                 if (file.createNewFile()) {
-                    log.i(String.format("Created file %s to download...", filename));
+                    log.d(String.format("Created file %s to download...", filename));
                 } else {
                     throw new RuntimeException(String.format("File %s already exists!", filename));
                 }
 
-                log.i("Sending wanted file's name...");
+                log.d("Sending wanted file's name...");
                 writer.println(filename);
 
                 byte[] buffer = new byte[BUFFER_SIZE];
 
-                log.i("Downloading file...");
+                log.d("Downloading file...");
                 try(final FileOutputStream fileWriter = new FileOutputStream(file)) {
                     int count;
 
@@ -186,8 +192,8 @@ public class Peer {
                     } while (count > 0);
                 }
 
-                log.i("File download! Updating on server...");
-                peer.update(filename);
+                log.d("File download! Updating on server...");
+                update(filename);
                 socket.close();
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -195,29 +201,24 @@ public class Peer {
         }
     }
 
-    static class ServerThread extends Thread {
-        private final int port;
-        private final File folder;
-
-        ServerThread(int port, File folder) {
-            this.port = port;
-            this.folder = folder;
-        }
-
+    class ServerThread extends Thread {
         @Override
         public void run() {
-            try(ServerSocket server = new ServerSocket(port)) {
-                log.i("Starting server...");
+            try {
+                log.d("Starting server...");
 
                 while (true) {
-                    log.i("Listening download requests...");
-                    Socket socket = server.accept();
-                    log.i(String.format("Connection established with peer %s", socket.getInetAddress().getHostName()));
+                    log.d("Listening download requests...");
+                    Socket socket = serverSocket.accept();
+                    log.d(String.format("Connection established with peer %s", socket.getInetAddress().getHostName()));
 
-                    UploadThread thread = new UploadThread(socket, folder);
+                    UploadThread thread = new UploadThread(socket);
                     thread.start();
                 }
+            } catch (SocketException e) {
+                System.out.println("Server thread interrupted...");
             } catch (Exception e) {
+                System.out.printf("Server thread failed: %s", e.getMessage());
                 log.e("Failed to start server!", e);
             }
         }
@@ -229,12 +230,10 @@ public class Peer {
 
             String ip = args[0];
             int port = Integer.parseInt(args[1]);
-            Peer peer = new Peer(ip, port);
+            Peer peer = new Peer(ip, port, Arrays.asList(args).contains("--d"));
 
+            peer.start();
             peer.join();
-
-            ServerThread serverThread = new ServerThread(port, peer.folder);
-            serverThread.start();
 
             boolean running = true;
 
@@ -248,17 +247,32 @@ public class Peer {
                     case SEARCH: peer.search(); break;
                     case DOWNLOAD: peer.download(); break;
                     case EXIT:
-                        serverThread.interrupt();
+                        peer.stop();
 
                         running = false;
                 }
             }
-        } catch (CancellationException e) {
+
             System.out.println("Peer finished!");
         } catch (NumberFormatException e) {
-            log.e(String.format("Port %s is invalid", args[1]), e);
+            System.out.printf("invalid port: %s", args[1]);
         } catch (Exception e) {
-            log.e("Peer execution error", e);
+            System.out.printf("Failed to initialize peer: %s", e.getMessage());
+        }
+    }
+
+    public void start() {
+        serverThread.start();
+    }
+
+    public void stop() {
+        try {
+            log.d("Leaving Napster...");
+            napster.leave(ip, port);
+            log.d("Interrupting server thread...");
+            serverSocket.close();
+        } catch (Exception e) {
+            log.e("Failed to stop peer!", e);
         }
     }
 
@@ -273,7 +287,7 @@ public class Peer {
 
         // TODO: Extract string results to enum
         if(result.equals("JOIN_OK")) {
-            log.i("Successfully joined to server!");
+            log.d("Successfully joined to server!");
         } else {
             throw new RuntimeException("Failed to join to server");
         }
@@ -294,7 +308,7 @@ public class Peer {
 
         // TODO: Extract result string
         if(result.equals("UPDATE_OK")) {
-            log.i(String.format("Updated server to serve file %s", filename));
+            log.d(String.format("Updated server to serve file %s", filename));
         } else {
             throw new RuntimeException(String.format("Failed to update file %s on server", filename));
         }
@@ -327,7 +341,7 @@ public class Peer {
             final String filename = readInput("Enter the filename: ");
 
             Socket socket = new Socket(ip, port);
-            DownloadThread thread = new DownloadThread(this, socket, filename);
+            DownloadThread thread = new DownloadThread(socket, filename);
 
             thread.start();
         } catch(IOException e) {

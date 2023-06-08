@@ -4,10 +4,16 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class ConsoleLog implements Log {
-    private static Logger logger;
+    private final Logger logger;
+    private boolean debug = false;
 
     public ConsoleLog(String tag) {
-        logger = Logger.getLogger(tag);
+        this.logger = Logger.getLogger(tag);
+    }
+
+    @Override
+    public void setDebug(boolean enable) {
+        debug = enable;
     }
 
     @Override
@@ -21,8 +27,8 @@ public class ConsoleLog implements Log {
     }
 
     @Override
-    public void i(String msg) {
-        logger.log(Level.INFO, msg);
+    public void d(String msg) {
+        if(debug) logger.log(Level.INFO, msg);
     }
 
     @Override
