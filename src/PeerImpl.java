@@ -67,15 +67,17 @@ public class PeerImpl implements Peer {
     }
 
     enum Operation {
-        UPDATE(1),
-        SEARCH(2),
-        DOWNLOAD(3),
-        EXIT(0);
+        UPDATE(1, "Atualizar"),
+        SEARCH(2, "Procurar"),
+        DOWNLOAD(3, "Baixar"),
+        EXIT(0, "Sair");
 
         private final Integer code;
+        private final String formattedName;
 
-        Operation(int code) {
+        Operation(int code, String formattedName) {
             this.code = code;
+            this.formattedName = formattedName;
         }
 
         public static Operation valueOf(Integer code) throws IllegalArgumentException {
@@ -98,7 +100,7 @@ public class PeerImpl implements Peer {
             System.out.print("\r");
 
             for (Operation operation : Operation.values()) {
-                System.out.printf("%d - %s\n", operation.getCode(), operation);
+                System.out.printf("%d - %s\n", operation.getCode(), operation.getFormattedName());
             }
 
             System.out.print("\n");
@@ -106,6 +108,10 @@ public class PeerImpl implements Peer {
 
         public int getCode() {
             return code;
+        }
+
+        public String getFormattedName() {
+            return formattedName;
         }
     }
 
@@ -211,16 +217,16 @@ public class PeerImpl implements Peer {
                 long bytesReceived = 0;
 
                 log.d("Downloading file...");
-                try(final FileOutputStream fileWriter = new FileOutputStream(file)) {
+                try (final FileOutputStream fileWriter = new FileOutputStream(file)) {
                     int count;
 
                     do {
                         count = (reader.read(buffer));
+                        bytesReceived += count;
 
                         if(count > 0) {
                             fileWriter.write(buffer, 0, count);
 
-                            bytesReceived += count;
                             progressBar.update(bytesReceived);
                             progressBar.print();
                         }

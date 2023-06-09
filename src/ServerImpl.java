@@ -37,7 +37,6 @@ public class ServerImpl implements Server {
 
     @Override
     public void close() {
-        // TODO: Notify peers that server stopped
         try {
             System.out.println("Stopping...");
             registry.unbind(NAPSTER_ADDRESS);

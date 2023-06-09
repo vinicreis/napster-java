@@ -26,22 +26,24 @@ public interface Peer extends Server {
                 while(running) {
                     final PeerImpl.Operation operation = PeerImpl.Operation.read();
 
-                    switch (operation) {
-                        case UPDATE: peer.update(); break;
-                        case SEARCH: peer.search(); break;
-                        case DOWNLOAD: peer.download(); break;
-                        case EXIT:
-                            running = false;
-                            break;
+                    try {
+                        switch (operation) {
+                            case UPDATE: peer.update(); break;
+                            case SEARCH: peer.search(); break;
+                            case DOWNLOAD: peer.download(); break;
+                            case EXIT:
+                                running = false;
+                                break;
+                        }
+                    } catch (Exception e) {
+                        System.out.printf("Falha ao executar operação %s\n", operation.getFormattedName());
                     }
                 }
             }
 
-            System.out.println("Peer finished!");
-        } catch (NumberFormatException e) {
-            System.out.printf("Invalid port: %s\n", args[1]);
+            System.out.println("Peer encerrado!");
         } catch (Exception e) {
-            System.out.printf("Failed to initialize peer: %s\n", e.getMessage());
+            System.out.println("Falha ao iniciar peer!" );
         }
     }
 }
