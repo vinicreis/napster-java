@@ -1,4 +1,3 @@
-public interface Server {
+public interface Server extends AutoCloseable {
     void start();
-    void stop();
 }

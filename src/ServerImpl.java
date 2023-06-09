@@ -24,20 +24,17 @@ public class ServerImpl implements Server {
     }
 
     public static void main(String[] args) {
-        try {
-            Server server = new ServerImpl(Arrays.asList(args).contains("--d"));
-
+        try (Server server = new ServerImpl(Arrays.asList(args).contains("--d"))) {
             server.start();
 
             System.out.println("\nPress any key to stop...");
 
             //noinspection ResultOfMethodCallIgnored
             System.in.read();
-
-            server.stop();
-            System.exit(0);
         } catch (Exception e) {
             System.out.println("Failed to start server");
+        } finally {
+            System.exit(0);
         }
     }
 
@@ -55,7 +52,7 @@ public class ServerImpl implements Server {
     }
 
     @Override
-    public void stop() {
+    public void close() {
         // TODO: Notify peers that server stopped
         try {
             System.out.println("Stopping...");
