@@ -35,7 +35,7 @@ public class PeerImpl implements Peer {
         try {
             log.setDebug(debug);
 
-            Registry registry = LocateRegistry.getRegistry();
+            final Registry registry = LocateRegistry.getRegistry();
             this.napster = (Napster) registry.lookup("rmi://localhost/napster");
 
             assert napster != null : "Napster server is not available";
@@ -95,6 +95,8 @@ public class PeerImpl implements Peer {
         }
 
         public static void print() {
+            System.out.print("\r");
+
             for (Operation operation : Operation.values()) {
                 System.out.printf("%d - %s\n", operation.getCode(), operation);
             }
@@ -108,30 +110,27 @@ public class PeerImpl implements Peer {
     }
 
     class UploadThread extends Thread {
-        private Socket socket;
-        private BufferedReader reader;
-        private OutputStream writer;
+        private static final String TAG = "UploadThread";
+        private final Socket socket;
+        private final BufferedReader reader;
+        private final OutputStream writer;
 
-        UploadThread(Socket socket) {
-            try {
-                this.socket = socket;
-                this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                this.writer = socket.getOutputStream();
-            } catch (Exception e) {
-                log.e("Failed to initialize UploadThread", e);
-            }
+        UploadThread(Socket socket) throws IOException {
+            this.setName(TAG + "-" + getId());
+            this.socket = socket;
+            this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            this.writer = socket.getOutputStream();
         }
 
         @Override
         public void run() {
             try {
                 log.d("Upload started! Reading desired file from client...");
-                final String filename = reader.readLine();
-                final File file = new File(folder.getPath(), filename);
+                final File file = new File(folder.getPath(), reader.readLine());
 
-                assert file.exists() : String.format("File %s not found!", filename);
+                assert file.exists() : String.format("File %s not found!", file.getName());
 
-                final ProgressBar progressBar = new ProgressBar(file.length(), "Uploading...");
+                final ProgressBar progressBar = new ProgressBar(getName(), file.length(), "Uploading...");
                 final DataOutputStream dataWriter = new DataOutputStream(socket.getOutputStream());
 
                 log.d("Sending file size to peer");
@@ -142,7 +141,15 @@ public class PeerImpl implements Peer {
                 long bytesSent = 0;
                 int bytesCount;
 
+                System.out.printf(
+                        "\n\n[%s] Enviando arquivo %s ao peer %s:%d...\n",
+                        getName(),
+                        file.getName(),
+                        socket.getInetAddress().getHostName(),
+                        socket.getPort()
+                );
                 log.d(String.format("Uploading file to peer %s", socket.getInetAddress().getHostName()));
+
                 do {
                     bytesCount = fileReader.read(buffer);
                     bytesSent += bytesCount;
@@ -159,6 +166,10 @@ public class PeerImpl implements Peer {
                 log.d("Upload finished! Closing connection...");
 
                 socket.close();
+            } catch (SocketException e) {
+                System.out.printf("%s: Falha ao enviar arquivo!\n", getName());
+
+                log.e(String.format("Failed to upload file to peer %s", socket.getInetAddress().getHostName()));
             } catch (Exception e) {
                 log.e(String.format("Failed to upload file to peer %s", socket.getInetAddress().getHostName()));
             }
@@ -166,39 +177,35 @@ public class PeerImpl implements Peer {
     }
 
     class DownloadThread extends Thread {
-        private Socket socket;
-        private BufferedInputStream reader;
-        private PrintWriter writer;
-        private String filename;
+        private static final String TAG = "DownloadThread";
+        private final Socket socket;
+        private final BufferedInputStream reader;
+        private final PrintWriter writer;
+        private final File file;
 
-        DownloadThread(Socket socket, String filename) {
-            try {
-                this.socket = socket;
-                this.reader = new BufferedInputStream(socket.getInputStream());
-                this.writer = new PrintWriter(socket.getOutputStream(), true);
-                this.filename = filename;
-            } catch (Exception e) {
-                log.e("Failed to initialize UploadThread", e);
-            }
+        DownloadThread(Socket socket, String filename) throws IOException {
+            this.setName(TAG + "-" + getId());
+            this.socket = socket;
+            this.reader = new BufferedInputStream(socket.getInputStream());
+            this.writer = new PrintWriter(socket.getOutputStream(), true);
+            this.file = new File(folder, filename);
         }
 
         @Override
         public void run() {
             try {
-                final File file = new File(folder, filename);
-
                 if (file.createNewFile()) {
-                    log.d(String.format("Created file %s to download...", filename));
+                    log.d(String.format("Created file %s to download...", file.getName()));
                 } else {
-                    throw new RuntimeException(String.format("File %s already exists!", filename));
+                    throw new RuntimeException(String.format("File %s already exists!", file.getName()));
                 }
 
                 log.d("Sending wanted file's name...");
-                writer.println(filename);
+                writer.println(file.getName());
 
                 final DataInputStream dataReader = new DataInputStream(socket.getInputStream());
                 final long fileSize = dataReader.readLong();
-                final ProgressBar progressBar = new ProgressBar(fileSize, "Downloading...");
+                final ProgressBar progressBar = new ProgressBar(getName(), fileSize, "Downloading...");
 
                 byte[] buffer = new byte[BUFFER_SIZE];
                 long bytesReceived = 0;
@@ -222,13 +229,29 @@ public class PeerImpl implements Peer {
 
                 log.d("File download! Updating on server...");
                 System.out.printf(
-                        "Arquivo %s baixado com sucesso na pasta %s",
+                        "[%s] Arquivo %s baixado com sucesso na pasta %s",
+                        getName(),
                         file.getName(),
                         folder.getPath()
                 );
-                update(filename);
-                socket.close();
+                update(file.getName());
+            } catch (SocketException e) {
+                System.out.println("Falha ao fazer download do arquivo!");
+
+                if (file.exists() && file.delete()) {
+                    System.out.printf("[%s] Arquivo %s deletado!\n", getName(), file.getName());
+                } else {
+                    System.out.printf("[%s] Sem arquivos para deletar\n", getName());
+                }
             } catch (Exception e) {
+                log.e("Failed to download file!", e);
+
+                if (file.exists() && file.delete()) {
+                    System.out.printf("[%s] Arquivo %s deletado!\n", getName(), file.getName());
+                } else {
+                    System.out.printf("[%s] Sem arquivos para deletar\n", getName());
+                }
+
                 throw new RuntimeException(e);
             }
         }
@@ -280,9 +303,9 @@ public class PeerImpl implements Peer {
         try {
             assert args.length >= 1 : "IP and port argument are mandatory";
 
-            String ip = args[0];
-            int port = Integer.parseInt(args[1]);
-            boolean debug = Arrays.asList(args).contains("--d");
+            final String ip = args[0];
+            final int port = Integer.parseInt(args[1]);
+            final boolean debug = Arrays.asList(args).contains("--d");
 
             try (Peer peer = new PeerImpl(ip, port, debug)) {
                 Runtime.getRuntime().addShutdownHook(new ShutdownHook(peer));
@@ -293,7 +316,7 @@ public class PeerImpl implements Peer {
                 boolean running = true;
 
                 while(running) {
-                    Operation operation = Operation.read();
+                    final Operation operation = Operation.read();
 
                     switch (operation) {
                         case UPDATE: peer.update(); break;
@@ -333,14 +356,13 @@ public class PeerImpl implements Peer {
 
     @Override
     public void join() throws RuntimeException, RemoteException {
-        File[] filesArray = folder.listFiles();
+        final File[] filesArray = folder.listFiles();
 
         assert filesArray != null : "Peer file list is null";
 
-        List<File> files = Arrays.asList(filesArray);
-        List<String> fileNames = files.stream().map(File::getName).collect(Collectors.toList());
-
-        String result = napster.join(ip, port, fileNames);
+        final List<File> files = Arrays.asList(filesArray);
+        final List<String> fileNames = files.stream().map(File::getName).collect(Collectors.toList());
+        final String result = napster.join(ip, port, fileNames);
 
         if(result.equals(JoinResponse.OK.getCode())) {
             log.d("Successfully joined to server!");
@@ -357,17 +379,15 @@ public class PeerImpl implements Peer {
 
     @Override
     public void update() throws RemoteException {
-        String filename = readInput("Enter the updated filename: ");
-
-        update(filename);
+        update(readInput("Enter the updated filename: "));
     }
 
     private void update(String filename) throws RemoteException {
-        File file = new File(folder.getAbsolutePath(), filename);
+        final File file = new File(folder.getAbsolutePath(), filename);
 
         assert file.exists() : String.format("File %s do not exists", filename);
 
-        String result = napster.update(ip, port, filename);
+        final String result = napster.update(ip, port, filename);
 
         if(result.equals(UpdateResponse.OK.getCode())) {
             log.d(String.format("Updated server to serve file %s", filename));
@@ -378,18 +398,20 @@ public class PeerImpl implements Peer {
 
     @Override
     public void search() throws RemoteException {
-        String filename = readInput("Enter the filename to search: ");
+        final String filename = readInput("Enter the filename to search: ");
 
-        List<String> result = napster.search(filename);
+        final List<String> result = napster.search(filename);
 
         if(result.isEmpty()) {
             System.out.printf("Nenhum peer possui o arquivo %s\n", filename);
         } else {
-            System.out.println("Peers com arquivos solicitados:");
+            System.out.println("\nPeers com arquivos solicitados:");
 
             for (String peer : result) {
                 System.out.println(peer);
             }
+
+            System.out.println();
         }
     }
 
@@ -400,8 +422,8 @@ public class PeerImpl implements Peer {
             final int port = Integer.parseInt(readInput("Enter peer port: "));
             final String filename = readInput("Enter the filename: ");
 
-            Socket socket = new Socket(ip, port);
-            DownloadThread thread = new DownloadThread(socket, filename);
+            final Socket socket = new Socket(ip, port);
+            final DownloadThread thread = new DownloadThread(socket, filename);
 
             thread.start();
         } catch(IOException e) {
@@ -410,7 +432,7 @@ public class PeerImpl implements Peer {
     }
 
     private static String readInput() {
-        Scanner in = new Scanner(System.in);
+        final Scanner in = new Scanner(System.in);
 
         return in.nextLine();
     }
