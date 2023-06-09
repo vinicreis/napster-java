@@ -13,11 +13,13 @@ public class ProgressBar {
         this.leftText = leftText;
     }
 
-    public void update(int value) {
+    public void update(long value) {
         progress = (double) total / value;
     }
 
     public void print() {
+        // FIXME: Not working during the update
+
         final long filledSize = Math.round(SIZE * progress);
         final long unfilledSize = Math.round(1 - SIZE * progress);
 

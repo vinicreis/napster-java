@@ -126,15 +126,20 @@ public class PeerImpl implements Peer {
         public void run() {
             try {
                 log.d("Upload started! Reading desired file from client...");
-                String filename = reader.readLine();
-                File file = new File(folder.getPath(), filename);
+                final String filename = reader.readLine();
+                final File file = new File(folder.getPath(), filename);
 
                 assert file.exists() : String.format("File %s not found!", filename);
 
-                ProgressBar progressBar = new ProgressBar(file.length(), "Uploading...");
-                FileInputStream fileReader = new FileInputStream(file);
-                byte[] buffer = new byte[BUFFER_SIZE];
-                int bytesSent = 0;
+                final ProgressBar progressBar = new ProgressBar(file.length(), "Uploading...");
+                final DataOutputStream dataWriter = new DataOutputStream(socket.getOutputStream());
+
+                log.d("Sending file size to peer");
+                dataWriter.writeLong(file.length());
+
+                final FileInputStream fileReader = new FileInputStream(file);
+                final byte[] buffer = new byte[BUFFER_SIZE];
+                long bytesSent = 0;
                 int bytesCount;
 
                 log.d(String.format("Uploading file to peer %s", socket.getInetAddress().getHostName()));
@@ -180,7 +185,7 @@ public class PeerImpl implements Peer {
         @Override
         public void run() {
             try {
-                File file = new File(folder, filename);
+                final File file = new File(folder, filename);
 
                 if (file.createNewFile()) {
                     log.d(String.format("Created file %s to download...", filename));
@@ -191,9 +196,12 @@ public class PeerImpl implements Peer {
                 log.d("Sending wanted file's name...");
                 writer.println(filename);
 
-                byte[] buffer = new byte[BUFFER_SIZE];
+                final DataInputStream dataReader = new DataInputStream(socket.getInputStream());
+                final long fileSize = dataReader.readLong();
+                final ProgressBar progressBar = new ProgressBar(fileSize, "Downloading...");
 
-                // TODO: Receive file size to show download progress
+                byte[] buffer = new byte[BUFFER_SIZE];
+                long bytesReceived = 0;
 
                 log.d("Downloading file...");
                 try(final FileOutputStream fileWriter = new FileOutputStream(file)) {
@@ -204,6 +212,10 @@ public class PeerImpl implements Peer {
 
                         if(count > 0) {
                             fileWriter.write(buffer, 0, count);
+
+                            bytesReceived += count;
+                            progressBar.update(bytesReceived);
+                            progressBar.print();
                         }
                     } while (count > 0);
                 }
