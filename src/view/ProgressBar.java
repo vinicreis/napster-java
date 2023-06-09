@@ -1,4 +1,4 @@
-package util;
+package view;
 
 public class ProgressBar {
     private static final int SIZE = 20;

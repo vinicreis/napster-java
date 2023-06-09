@@ -1,11 +1,10 @@
-import service.NapsterImpl;
 import log.ConsoleLog;
 import log.Log;
+import service.NapsterImpl;
 
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
-import java.util.Arrays;
 
 public class ServerImpl implements Server {
     private static final String TAG = "ServerImpl";
@@ -15,27 +14,12 @@ public class ServerImpl implements Server {
     private final Registry registry;
     private final boolean debug;
 
-    private ServerImpl(boolean debug) throws RemoteException {
+    public ServerImpl(boolean debug) throws RemoteException {
         this.debug = debug;
         this.log.setDebug(debug);
 
         log.d("Creating registry...");
         registry = LocateRegistry.createRegistry(REGISTRY_PORT);
-    }
-
-    public static void main(String[] args) {
-        try (Server server = new ServerImpl(Arrays.asList(args).contains("--d"))) {
-            server.start();
-
-            System.out.println("\nPress any key to stop...");
-
-            //noinspection ResultOfMethodCallIgnored
-            System.in.read();
-        } catch (Exception e) {
-            System.out.println("Failed to start server");
-        } finally {
-            System.exit(0);
-        }
     }
 
     @Override

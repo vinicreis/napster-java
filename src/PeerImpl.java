@@ -3,7 +3,7 @@ import model.response.UpdateResponse;
 import service.Napster;
 import log.ConsoleLog;
 import log.Log;
-import util.ProgressBar;
+import view.ProgressBar;
 
 import java.io.*;
 import java.net.ServerSocket;
@@ -31,7 +31,7 @@ public class PeerImpl implements Peer {
     private final ServerThread serverThread;
     private final ServerSocket serverSocket;
 
-    private PeerImpl(String ip, Integer port, boolean debug) throws NotBoundException, IOException {
+    PeerImpl(String ip, Integer port, boolean debug) throws NotBoundException, IOException {
         try {
             log.setDebug(debug);
 
@@ -299,44 +299,6 @@ public class PeerImpl implements Peer {
         }
     }
 
-    public static void main(String[] args) {
-        try {
-            assert args.length >= 1 : "IP and port argument are mandatory";
-
-            final String ip = args[0];
-            final int port = Integer.parseInt(args[1]);
-            final boolean debug = Arrays.asList(args).contains("--d");
-
-            try (Peer peer = new PeerImpl(ip, port, debug)) {
-                Runtime.getRuntime().addShutdownHook(new ShutdownHook(peer));
-
-                peer.start();
-                peer.join();
-
-                boolean running = true;
-
-                while(running) {
-                    final Operation operation = Operation.read();
-
-                    switch (operation) {
-                        case UPDATE: peer.update(); break;
-                        case SEARCH: peer.search(); break;
-                        case DOWNLOAD: peer.download(); break;
-                        case EXIT:
-                            running = false;
-                            break;
-                    }
-                }
-            }
-
-            System.out.println("Peer finished!");
-        } catch (NumberFormatException e) {
-            System.out.printf("Invalid port: %s\n", args[1]);
-        } catch (Exception e) {
-            System.out.printf("Failed to initialize peer: %s\n", e.getMessage());
-        }
-    }
-
     @Override
     public void start() {
         serverThread.start();
@@ -403,7 +365,7 @@ public class PeerImpl implements Peer {
         final List<String> result = napster.search(filename);
 
         if(result.isEmpty()) {
-            System.out.printf("Nenhum peer possui o arquivo %s\n", filename);
+            System.out.printf("\nNenhum peer possui o arquivo %s\n", filename);
         } else {
             System.out.println("\nPeers com arquivos solicitados:");
 
