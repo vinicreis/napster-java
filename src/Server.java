@@ -2,18 +2,17 @@ import service.Napster;
 import util.ConsoleLog;
 import util.Log;
 
-import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.Arrays;
 
-public class Server {
+public class Server implements IServer {
     private static final int REGISTRY_PORT = 1099;
     private static final String NAPSTER_ADDRESS = "rmi://localhost/napster";
     private final Log log = new ConsoleLog("Server");
     private final Registry registry;
-    private boolean debug = false;
+    private final boolean debug;
 
     private Server(boolean debug) throws RemoteException {
         this.debug = debug;
@@ -31,6 +30,7 @@ public class Server {
 
             System.out.println("\nPress any key to stop...");
 
+            //noinspection ResultOfMethodCallIgnored
             System.in.read();
 
             server.stop();
@@ -40,6 +40,7 @@ public class Server {
         }
     }
 
+    @Override
     public void start() {
         try {
             log.d("Binding service...");
@@ -52,10 +53,15 @@ public class Server {
         }
     }
 
-    public void stop() throws NotBoundException, RemoteException {
+    @Override
+    public void stop() {
         // TODO: Notify peers that server stopped
-        System.out.println("Stopping...");
-        registry.unbind(NAPSTER_ADDRESS);
-        System.out.println("Service unbound!");
+        try {
+            System.out.println("Stopping...");
+            registry.unbind(NAPSTER_ADDRESS);
+            System.out.println("Service unbound!");
+        } catch (Exception e) {
+            log.e("Failed to stop server gracefully!", e);
+        }
     }
 }

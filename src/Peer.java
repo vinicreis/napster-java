@@ -1,3 +1,5 @@
+import model.response.JoinResponse;
+import model.response.UpdateResponse;
 import service.INapster;
 import util.ConsoleLog;
 import util.Log;
@@ -16,7 +18,7 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.stream.Collectors;
 
-public class Peer {
+public class Peer implements IPeer {
     private static final int BUFFER_SIZE = 4096;
     private final INapster napster;
     private final Log log = new ConsoleLog("Peer");
@@ -49,7 +51,7 @@ public class Peer {
                     ).toUri()
             );
 
-            if(!this.folder.exists() && !this.folder.mkdir()) {
+            if(!this.folder.exists() && !this.folder.mkdirs()) {
                 throw new RuntimeException("Failed to create peer folder");
             }
 
@@ -206,6 +208,7 @@ public class Peer {
             try {
                 log.d("Starting server...");
 
+                //noinspection InfiniteLoopStatement
                 while (true) {
                     log.d("Listening download requests...");
                     Socket socket = serverSocket.accept();
@@ -275,6 +278,7 @@ public class Peer {
         }
     }
 
+    @Override
     public void join() throws RuntimeException, RemoteException {
         File[] filesArray = folder.listFiles();
 
@@ -284,35 +288,35 @@ public class Peer {
 
         String result = napster.join(ip, port, files.stream().map(File::getName).collect(Collectors.toList()));
 
-        // TODO: Extract string results to enum
-        if(result.equals("JOIN_OK")) {
+        if(result.equals(JoinResponse.OK.getCode())) {
             log.d("Successfully joined to server!");
         } else {
             throw new RuntimeException("Failed to join to server");
         }
     }
 
+    @Override
     public void update() throws RemoteException {
         String filename = readInput("Enter the updated filename: ");
 
         update(filename);
     }
 
-    public void update(String filename) throws RemoteException {
+    private void update(String filename) throws RemoteException {
         File file = new File(folder.getAbsolutePath(), filename);
 
         assert file.exists() : String.format("File %s do not exists", filename);
 
         String result = napster.update(ip, port, filename);
 
-        // TODO: Extract result string
-        if(result.equals("UPDATE_OK")) {
+        if(result.equals(UpdateResponse.OK.getCode())) {
             log.d(String.format("Updated server to serve file %s", filename));
         } else {
             throw new RuntimeException(String.format("Failed to update file %s on server", filename));
         }
     }
 
+    @Override
     public void search() throws RemoteException {
         String filename = readInput("Enter the filename to search: ");
 
@@ -329,6 +333,7 @@ public class Peer {
         }
     }
 
+    @Override
     public void download() {
         try {
             final String ip = readInput("Enter peer IP: ");

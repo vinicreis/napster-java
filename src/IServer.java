@@ -1,3 +1,4 @@
 public interface IServer {
-    void start(int port);
+    void start();
+    void stop();
 }

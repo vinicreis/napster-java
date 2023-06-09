@@ -1,4 +1,8 @@
+import java.rmi.RemoteException;
+
 public interface IPeer {
-    Boolean open(String ip, int port);
-    Boolean close();
+    void join() throws RuntimeException, RemoteException;
+    void update() throws RemoteException;
+    void search() throws RemoteException;
+    void download();
 }

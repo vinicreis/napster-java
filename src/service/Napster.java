@@ -2,8 +2,8 @@ package service;
 
 import model.repository.PeerRepository;
 import model.repository.PeerRepositoryImpl;
-import util.Log;
 import util.ConsoleLog;
+import util.Log;
 
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
@@ -12,8 +12,6 @@ import java.util.List;
 public class Napster extends UnicastRemoteObject implements INapster {
     private final Log log = new ConsoleLog("Napster");
     private final PeerRepository repository = new PeerRepositoryImpl();
-
-    public Napster() throws RemoteException { }
 
     public Napster(boolean debug) throws RemoteException {
         super();
