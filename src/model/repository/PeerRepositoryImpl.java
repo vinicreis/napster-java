@@ -3,13 +3,14 @@ package model.repository;
 import model.response.JoinResponse;
 import model.response.LeaveResponse;
 import model.response.UpdateResponse;
-import util.ConsoleLog;
-import util.Log;
+import log.ConsoleLog;
+import log.Log;
 
 import java.util.*;
 
 public class PeerRepositoryImpl implements PeerRepository {
-    private static final Log log = new ConsoleLog("PeerRepositoryImpl");
+    private static final String TAG = "PeerRepositoryImpl";
+    private static final Log log = new ConsoleLog(TAG);
     private final HashMap<String, LinkedHashSet<String>> peerMap = new HashMap<>();
 
     @Override

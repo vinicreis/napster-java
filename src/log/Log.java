@@ -1,4 +1,4 @@
-package util;
+package log;
 
 public interface Log {
     void setDebug(boolean enable);

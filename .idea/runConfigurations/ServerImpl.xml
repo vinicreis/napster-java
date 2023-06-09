@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Server" type="Application" factoryName="Application" nameIsGenerated="true">
-    <option name="MAIN_CLASS_NAME" value="Server" />
+  <configuration default="false" name="ServerImpl" type="Application" factoryName="Application" nameIsGenerated="true">
+    <option name="MAIN_CLASS_NAME" value="ServerImpl" />
     <module name="napster-java" />
     <option name="PROGRAM_PARAMETERS" value="--d" />
     <method v="2">

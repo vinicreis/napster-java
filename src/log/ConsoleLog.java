@@ -1,4 +1,4 @@
-package util;
+package log;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
