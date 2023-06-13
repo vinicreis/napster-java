@@ -7,11 +7,14 @@ import log.ConsoleLog;
 import log.Log;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 
 public class PeerRepositoryImpl implements PeerRepository {
     private static final String TAG = "PeerRepositoryImpl";
     private static final Log log = new ConsoleLog(TAG);
-    private final HashMap<String, LinkedHashSet<String>> peerMap = new HashMap<>();
+    private final ConcurrentMap<String, Set<String>> peerMap = new ConcurrentHashMap<>();
 
     @Override
     public String key(String ip, Integer port) {
@@ -24,7 +27,7 @@ public class PeerRepositoryImpl implements PeerRepository {
             if (peerMap.containsKey(key(ip, port)))
                 return JoinResponse.NOT_AVAILABLE;
 
-            LinkedHashSet<String> hostFiles = peerMap.getOrDefault(key(ip, port), new LinkedHashSet<>());
+            Set<String> hostFiles = peerMap.getOrDefault(key(ip, port), new ConcurrentSkipListSet<>());
 
             hostFiles.addAll(files);
 
@@ -42,7 +45,7 @@ public class PeerRepositoryImpl implements PeerRepository {
     public List<String> search(String file) {
         List<String> foundOn = new ArrayList<>();
 
-        for (Map.Entry<String, LinkedHashSet<String>> entry : peerMap.entrySet()) {
+        for (Map.Entry<String, Set<String>> entry : peerMap.entrySet()) {
             if(entry.getValue().stream().anyMatch(peerFile -> peerFile.equals(file))) {
                 foundOn.add(entry.getKey());
             }
@@ -57,7 +60,7 @@ public class PeerRepositoryImpl implements PeerRepository {
             if(!peerMap.containsKey(key(ip, port)))
                 return UpdateResponse.NOT_JOINED;
 
-            LinkedHashSet<String> hostFiles = peerMap.getOrDefault(key(ip, port), new LinkedHashSet<>());
+            Set<String> hostFiles = peerMap.getOrDefault(key(ip, port), new ConcurrentSkipListSet<>());
 
             hostFiles.add(file);
 
