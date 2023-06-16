@@ -1,8 +1,8 @@
-package model.repository;
+package service.model.repository;
 
-import model.response.JoinResponse;
-import model.response.LeaveResponse;
-import model.response.UpdateResponse;
+import service.model.response.JoinResponse;
+import service.model.response.LeaveResponse;
+import service.model.response.UpdateResponse;
 
 import java.util.List;
 

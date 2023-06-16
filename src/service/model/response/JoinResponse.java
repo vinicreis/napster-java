@@ -1,4 +1,4 @@
-package model.response;
+package service.model.response;
 
 public enum JoinResponse {
     OK("JOIN_OK"),

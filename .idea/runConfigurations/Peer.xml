@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Peer" type="Application" factoryName="Application" singleton="false">
-    <option name="MAIN_CLASS_NAME" value="PeerImpl" />
+    <option name="MAIN_CLASS_NAME" value="peer.PeerImpl" />
     <module name="napster-java" />
     <option name="PROGRAM_PARAMETERS" value="--d" />
     <extension name="coverage">

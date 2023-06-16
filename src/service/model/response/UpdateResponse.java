@@ -1,4 +1,4 @@
-package model.response;
+package service.model.response;
 
 public enum UpdateResponse {
     OK("UPDATE_OK"),

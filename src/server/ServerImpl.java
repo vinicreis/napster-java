@@ -1,3 +1,5 @@
+package server;
+
 import log.ConsoleLog;
 import log.Log;
 import service.NapsterImpl;
@@ -8,7 +10,7 @@ import java.rmi.registry.Registry;
 import java.util.Arrays;
 
 public class ServerImpl implements Server {
-    private static final String TAG = "ServerImpl";
+    private static final String TAG = "server.ServerImpl";
     private static final int REGISTRY_PORT = 1099;
     private static final String NAPSTER_ADDRESS = "rmi://localhost/napster";
     private final Log log = new ConsoleLog(TAG);
@@ -44,7 +46,7 @@ public class ServerImpl implements Server {
             log.d("Binding service...");
             registry.bind(NAPSTER_ADDRESS, new NapsterImpl(debug));
 
-            System.out.println("Server ready!");
+            System.out.println("server.Server ready!");
         } catch (Exception e) {
             System.out.printf("Failed to start server: %s", e.getMessage());
             log.e("Failed to start server", e);

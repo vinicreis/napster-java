@@ -1,10 +1,10 @@
 package service;
 
-import model.repository.PeerRepository;
-import model.repository.PeerRepositoryImpl;
+import service.model.repository.PeerRepository;
+import service.model.repository.PeerRepositoryImpl;
 import log.ConsoleLog;
 import log.Log;
-import model.response.JoinResponse;
+import service.model.response.JoinResponse;
 
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
@@ -35,16 +35,16 @@ public class NapsterImpl extends UnicastRemoteObject implements Napster {
         final JoinResponse response = repository.join(ip, port, files);
 
         if(response == JoinResponse.OK)
-            System.out.printf("Peer %s:%d adicionado com os arquivos %s\n", ip, port, String.join(", ", files));
+            System.out.printf("peer.Peer %s:%d adicionado com os arquivos %s\n", ip, port, String.join(", ", files));
 
         return response.getCode();
     }
 
     @Override
     public List<String> search(String ip, Integer port, String filenameWithExtension) throws RemoteException {
-        log.d(String.format("Peer asked for file %s", filenameWithExtension));
+        log.d(String.format("peer.Peer asked for file %s", filenameWithExtension));
 
-        System.out.printf("Peer %s:%d solicitou o arquivo %s\n", ip, port, filenameWithExtension);
+        System.out.printf("peer.Peer %s:%d solicitou o arquivo %s\n", ip, port, filenameWithExtension);
 
         return repository.search(filenameWithExtension);
     }

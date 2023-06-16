@@ -1,9 +1,8 @@
-package model.response;
+package service.model.response;
 
 public enum LeaveResponse {
     OK("LEAVE_OK"),
-    NOT_JOINED("LEAVE_NOT_AVAILABLE"),
-    ERROR("LEAVE_ERROR");
+    NOT_JOINED("LEAVE_NOT_AVAILABLE");
 
     private final String code;
 
