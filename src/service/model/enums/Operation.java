@@ -42,6 +42,14 @@ public enum Operation {
         System.out.print("\n");
     }
 
+    public static void reprint() {
+        System.out.println();
+
+        print();
+
+        System.out.println("Selecione uma opção: ");
+    }
+
     public int getCode() {
         return code;
     }

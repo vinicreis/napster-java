@@ -6,11 +6,12 @@ e utiliza RMI e comunicação TCP para implementação do serviço.
 
 ## Como utilizar
 
-- Executar uma instância do Servidor no arquivo `server.ServerImpl.java`
-- Executar quantas instâncias se desejar de peers, no arquivo `peer.PeerImpl.java`
+- Compilar os arquivos do projeto utilizando Java 8
+- Executar uma instância do Servidor na classe `server.ServerImpl`
+- Executar quantas instâncias se desejar de peers, na classe `peer.PeerImpl`
 - Cada peer deve primeiro inicializar no servidor fornecendo IP, porta e pasta 
 de onde serão armazenados e carregados os arquivos
 - Agora, podemos executar uma das operações que são
-  - Search: 
-  - Download:
-  - Update:
+  - Update: atualização de um arquivo adicionado a pasta;
+  - Search: busca de um arquivo disponível por Peers no servidor
+  - Download: download de um arquivo diretamente de um Peer

@@ -2,6 +2,7 @@ package peer.thread;
 
 import log.ConsoleLog;
 import log.Log;
+import service.model.enums.Operation;
 import view.ProgressBar;
 
 import java.io.*;
@@ -41,42 +42,48 @@ public class UploadThread extends Thread {
             log.d("Sending file size to peer");
             dataWriter.writeLong(file.length());
 
-            final FileInputStream fileReader = new FileInputStream(file);
             final byte[] buffer = new byte[BUFFER_SIZE];
             long bytesSent = 0;
             int bytesCount;
 
             System.out.printf(
-                    "\n\n[%s] Enviando arquivo %s ao peer %s:%d...\n",
-                    getName(),
+                    "\n\nEnviando arquivo %s ao peer %s:%d...\n",
                     file.getName(),
                     socket.getInetAddress().getHostName(),
                     socket.getPort()
             );
             log.d(String.format("Uploading file to peer %s", socket.getInetAddress().getHostName()));
 
-            do {
-                bytesCount = fileReader.read(buffer);
-                bytesSent += bytesCount;
+            try(final FileInputStream fileReader = new FileInputStream(file)) {
+                do {
+                    bytesCount = fileReader.read(buffer);
+                    bytesSent += bytesCount;
 
-                if(bytesCount > 0) {
-                    writer.write(buffer, 0, bytesCount);
-                    writer.flush();
+                    if(bytesCount > 0) {
+                        writer.write(buffer, 0, bytesCount);
+                        writer.flush();
 
-                    progressBar.update(bytesSent);
-                    progressBar.print();
-                }
-            } while (bytesCount > 0);
+                        progressBar.update(bytesSent);
+//                    progressBar.print();
+                    }
+                } while (bytesCount > 0);
+            }
 
             log.d("Upload finished! Closing connection...");
-
-            socket.close();
         } catch (SocketException e) {
-            System.out.printf("%s: Falha ao enviar arquivo!\n", getName());
+            System.out.println("Falha ao enviar arquivo!");
 
-            log.e(String.format("Failed to upload file to peer %s", socket.getInetAddress().getHostName()));
+            log.e(String.format("Failed to upload file to peer %s", socket.getInetAddress().getHostName()), e);
         } catch (Exception e) {
-            log.e(String.format("Failed to upload file to peer %s", socket.getInetAddress().getHostName()));
+            log.e(String.format("Failed to upload file to peer %s", socket.getInetAddress().getHostName()), e);
+        } finally {
+            try {
+                socket.close();
+            } catch (IOException e) {
+                // Ignore close errors
+            }
+
+            Operation.reprint();
         }
     }
 }

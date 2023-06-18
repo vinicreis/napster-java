@@ -29,12 +29,12 @@ public class ServerImpl implements Server {
         try (Server server = new ServerImpl(Arrays.asList(args).contains("--d"))) {
             server.start();
 
-            System.out.println("\nPress any key to stop...");
+            System.out.println("\nPressione qualquer tecla para encerrar...");
 
             //noinspection ResultOfMethodCallIgnored
             System.in.read();
         } catch (Exception e) {
-            System.out.println("Failed to start server");
+            System.out.println("Falha ao iniciar servidor!");
         }
 
         System.exit(0);
@@ -46,9 +46,9 @@ public class ServerImpl implements Server {
             log.d("Binding service...");
             registry.bind(NAPSTER_ADDRESS, new NapsterImpl(debug));
 
-            System.out.println("server.Server ready!");
+            System.out.println("Servidor iniciado!");
         } catch (Exception e) {
-            System.out.printf("Failed to start server: %s", e.getMessage());
+            System.out.printf("Falha ao iniciar o servidor!", e.getMessage());
             log.e("Failed to start server", e);
         }
     }
@@ -56,9 +56,9 @@ public class ServerImpl implements Server {
     @Override
     public void close() {
         try {
-            System.out.println("Stopping...");
+            System.out.println("Finalizando...");
             registry.unbind(NAPSTER_ADDRESS);
-            System.out.println("Service unbound!");
+            System.out.println("Serviço finalizado!");
         } catch (Exception e) {
             log.e("Failed to stop server gracefully!", e);
         }

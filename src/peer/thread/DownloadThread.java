@@ -2,6 +2,7 @@ package peer.thread;
 
 import log.ConsoleLog;
 import log.Log;
+import service.model.enums.Operation;
 import view.ProgressBar;
 
 import java.io.*;
@@ -64,15 +65,14 @@ public class DownloadThread extends Thread {
                         fileWriter.write(buffer, 0, count);
 
                         progressBar.update(bytesReceived);
-                        progressBar.print();
+//                        progressBar.print();
                     }
                 } while (count > 0);
             }
 
             log.d("File download! Updating on server...");
             System.out.printf(
-                    "[%s] Arquivo %s baixado com sucesso na pasta %s",
-                    getName(),
+                    "\n\nArquivo %s baixado com sucesso na pasta %s",
                     file.getName(),
                     file.getParentFile().getPath()
             );
@@ -82,9 +82,9 @@ public class DownloadThread extends Thread {
             System.out.println("Falha ao fazer download do arquivo!");
 
             if (file.exists() && file.delete()) {
-                System.out.printf("[%s] Arquivo %s deletado!\n", getName(), file.getName());
+                System.out.printf("Arquivo %s deletado!\n", file.getName());
             } else {
-                System.out.printf("[%s] Sem arquivos para deletar\n", getName());
+                System.out.printf("Sem arquivos para deletar\n");
             }
 
             callback.onError(e);
@@ -92,12 +92,20 @@ public class DownloadThread extends Thread {
             log.e("Failed to download file!", e);
 
             if (file.exists() && file.delete()) {
-                System.out.printf("[%s] Arquivo %s deletado!\n", getName(), file.getName());
+                System.out.printf("Arquivo %s deletado!\n", file.getName());
             } else {
-                System.out.printf("[%s] Sem arquivos para deletar\n", getName());
+                System.out.println("Sem arquivos para deletar");
             }
 
             callback.onError(e);
+        } finally {
+            try {
+                socket.close();
+            } catch (IOException e) {
+                // Ignore close errors
+            }
+
+            Operation.reprint();
         }
     }
 }
