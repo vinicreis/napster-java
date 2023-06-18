@@ -84,7 +84,7 @@ public class DownloadThread extends Thread {
             if (file.exists() && file.delete()) {
                 System.out.printf("Arquivo %s deletado!\n", file.getName());
             } else {
-                System.out.printf("Sem arquivos para deletar\n");
+                System.out.println("Sem arquivos para deletar");
             }
 
             callback.onError(e);

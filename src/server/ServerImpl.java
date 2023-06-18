@@ -48,7 +48,7 @@ public class ServerImpl implements Server {
 
             System.out.println("Servidor iniciado!");
         } catch (Exception e) {
-            System.out.printf("Falha ao iniciar o servidor!", e.getMessage());
+            System.out.println("Falha ao iniciar o servidor!");
             log.e("Failed to start server", e);
         }
     }
