@@ -15,6 +15,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URI;
 import java.nio.file.Paths;
+import java.rmi.ConnectException;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
@@ -29,7 +30,7 @@ import static util.IOUtil.readInput;
 public class PeerImpl implements Peer {
     private static final String DEFAULT_FOLDER = "data";
     private static final String DEFAULT_FOLDER_FORMAT = "peer-%s-%d";
-    private static final String TAG = "peer.PeerImpl";
+    private static final String TAG = "PeerImpl";
     private final Napster napster;
     private final Log log = new ConsoleLog(TAG);
     private String ip;
@@ -60,9 +61,11 @@ public class PeerImpl implements Peer {
                 Runtime.getRuntime().addShutdownHook(peer.onShutdown());
 
                 peer.start();
+            } catch (ConnectException e) {
+                System.out.println("Falha na conexão com o serviço remoto!\nVerifique se o serviço está ativo.");
             }
 
-            System.out.println("peer.Peer encerrado!");
+            System.out.println("Peer encerrado!");
         } catch (Exception e) {
             System.out.println("Falha ao iniciar peer!" );
         }
@@ -96,7 +99,7 @@ public class PeerImpl implements Peer {
             log.d("Leaving Napster...");
             napster.leave(ip, port);
             if(serverSocket != null) {
-                log.d("Interrupting server peer.thread...");
+                log.d("Interrupting server thread...");
                 serverSocket.close();
             }
         } catch (Exception e) {
@@ -108,7 +111,7 @@ public class PeerImpl implements Peer {
     public void join() {
         try {
             if (isJoined()) {
-                System.out.println("peer.Peer já inicializado!");
+                System.out.println("Peer já inicializado!");
                 return;
             }
 
@@ -126,13 +129,13 @@ public class PeerImpl implements Peer {
 
             final String enteredFolder = readInput("Digite o caminho da pasta do peer\n[%s]\nPasta:", defaultFolder.getPath());
 
-            if(enteredFolder != null && !enteredFolder.isEmpty()){
+            if (enteredFolder != null && !enteredFolder.isEmpty()) {
                 folder = new File(enteredFolder);
             } else {
                 folder = new File(defaultFolder);
             }
 
-            if(!this.folder.exists() && !this.folder.mkdirs()) {
+            if (!this.folder.exists() && !this.folder.mkdirs()) {
                 throw new RuntimeException("Falha ao criar pasta do peer");
             }
 
@@ -161,8 +164,8 @@ public class PeerImpl implements Peer {
             log.e("Failed to run operation on remote service", e);
             System.out.println("Falha na execução da operação no serviço remoto");
         } catch (IOException e) {
-            log.e("Failed to start server peer.thread", e);
-            System.out.println("Falha ao iniciar peer.thread do servidor");
+            log.e("Failed to start server thread", e);
+            System.out.println("Falha ao iniciar thread do servidor");
         } catch (RuntimeException e) {
             log.e("Failed to run operation", e);
             System.out.println("Falha ao executar operação");
@@ -180,7 +183,7 @@ public class PeerImpl implements Peer {
     @Override
     public void update(String filename) {
         try {
-            check(isJoined(), "peer.Peer deve ser inicializado (função 1)!");
+            check(isJoined(), "Peer deve ser inicializado (função 1)!");
 
             final File file = new File(folder.getAbsolutePath(), filename);
 
@@ -207,7 +210,7 @@ public class PeerImpl implements Peer {
     @Override
     public void search() {
         try {
-            check(isJoined(), "peer.Peer deve ser inicializado (função 1)!");
+            check(isJoined(), "Peer deve ser inicializado (função 1)!");
 
             final String filename = readInput("Enter the filename to search: ");
 
@@ -238,7 +241,7 @@ public class PeerImpl implements Peer {
     @Override
     public void download() {
         try {
-            check(isJoined(), "peer.Peer deve ser inicializado (função 1)!");
+            check(isJoined(), "Peer deve ser inicializado (função 1)!");
 
             final String ip = readInput("Enter peer IP: ");
             final int port = Integer.parseInt(readInput("Enter peer port: "));
